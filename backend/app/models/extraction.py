@@ -10,6 +10,8 @@ class ExtractEntity(BaseModel):
 class ExtractRelation(BaseModel):
     source: str
     target: str
+    source_label: str
+    target_label: str
     type: str
     evidence: str
     confidence: float = Field(default=1.0, ge=0, le=1)

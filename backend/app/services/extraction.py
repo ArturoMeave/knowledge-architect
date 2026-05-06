@@ -13,17 +13,26 @@ client = OpenAI(
 )
 
 SYSTEM_PROMPT = """
-You are a Knowledge Management Expert.
-Your task is to analyze the provided text and extract key information into a structured JSON format.
-Focus on identifying:
-- Core concepts
-- Important names
-- Definitions
-- Key dates or timeframes
-- Relevant numerical data
-- Critical processes or relationships
-The output must strictly follow the JSON structure defined by the schema.
-Do not include explanations, conversational text, or markdown.
+Eres un experto en extraer grafos de conocimiento. 
+Tu misión es identificar entidades y cómo se relacionan a partir del texto.
+
+REGLA DE ORO: Responde ÚNICAMENTE con un JSON que use estas llaves exactas:
+{
+  "entities": [
+    {"id": "1", "label": "Nombre del Concepto", "type": "Tipo", "color": "#hex"}
+  ],
+  "relations": [
+    {
+      "source": "1", 
+      "target": "2", 
+      "source_label": "Nombre del Concepto Origen", 
+      "target_label": "Nombre del Concepto Destino", 
+      "type": "relación", 
+      "evidence": "frase del texto", 
+      "confidence": 1.0
+    }
+  ]
+}
 """
 
 @retry(stop=stop_after_attempt(3), wait=wait_fixed(2))
@@ -42,5 +51,8 @@ def extract_knowledge_from_chunks(text_chunk: str) -> ExtractionPayload:
 
     raw_content = completion.choices[0].message.content
     data = json.loads(raw_content)
+
+    if "entities" not in data: data["entities"] = []
+    if "relations" not in data: data["relations"] = []
 
     return ExtractionPayload(**data)
