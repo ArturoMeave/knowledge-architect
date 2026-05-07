@@ -1,26 +1,31 @@
 import os
-from neo4j import GraphDatabase
+from neo4j import AsyncGraphDatabase
 from dotenv import load_dotenv
 
 load_dotenv()
 
 class GraphDB:
     def __init__(self):
-        self.driver = GraphDatabase.driver(
+        self.driver = AsyncGraphDatabase.driver(
             os.getenv("NEO4J_URI"),
             auth=(os.getenv("NEO4J_USER"), os.getenv("NEO4J_PASSWORD"))
         )
 
-    def close(self):
-        self.driver.close()
+    async def close(self):
+        await self.driver.close()
     
-    def get_graph_data(self):
-        with self.driver.session() as session:
-            result = session.run("MATCH (n)-[r]->(m) RETURN n, r,m")
+    async def init_db(self):
+        async with self.driver.session() as session:
+            await session.run("CREATE INDEX IF NOT EXISTS FOR (n:Entity) ON (n.id)")
+    
+    async def get_graph_data(self):
+        async with self.driver.session() as session:
+            result = await session.run("MATCH (n)-[r]->(m) RETURN n, r, m")
+            records = await result.data()
             nodes = {}
             edges = []
 
-            for record in result:
+            for record in records:
                 n = record["n"]
                 if n["id"] not in nodes:
                     nodes[n["id"]] = {
@@ -47,16 +52,16 @@ class GraphDB:
                 })
             return {"nodes": list(nodes.values()), "edges": edges}
 
-    def save_graph(self, nodes, edges):
-        with self.driver.session() as session:
+    async def save_graph(self, nodes, edges):
+        async with self.driver.session() as session:
             for node in nodes:
-                session.run("""
+                await session.run("""
                     MERGE (n:Entity {id: $id})
                     SET n.label = $label, n.type = $type, n.color = $color
                 """, id=node.id, label=node.label, type=node.type, color=node.color)
 
             for edge in edges:
-                session.run("""
+                await session.run("""
                     MATCH (a:Entity {id: $source})
                     MATCH (b:Entity {id: $target})
                     MERGE (a)-[r:RELATED {type: $rel_type}]->(b)
