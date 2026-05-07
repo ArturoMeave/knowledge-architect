@@ -5,3 +5,6 @@ PyPDF2
 pydantic
 openai
 tenacity
+neo4j
+python-dotenv
+python-multipart

@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.routes import ingest
+from app.api.routes import ingest, graph
 
 app = FastAPI(title='Knowledge Architect API')
 
@@ -13,6 +13,7 @@ app.add_middleware(
 )
 
 app.include_router(ingest.router)
+app.include_router(graph.router)
 
 @app.get("/")
 async def health_check():

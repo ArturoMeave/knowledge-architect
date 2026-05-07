@@ -6,7 +6,6 @@ load_dotenv()
 
 class GraphDB:
     def __init__(self):
-        # Creamos la conexión oficial con la nube
         self.driver = GraphDatabase.driver(
             os.getenv("NEO4J_URI"),
             auth=(os.getenv("NEO4J_USER"), os.getenv("NEO4J_PASSWORD"))
@@ -14,17 +13,48 @@ class GraphDB:
 
     def close(self):
         self.driver.close()
+    
+    def get_graph_data(self):
+        with self.driver.session() as session:
+            result = session.run("MATCH (n)-[r]->(m) RETURN n, r,m")
+            nodes = {}
+            edges = []
+
+            for record in result:
+                n = record["n"]
+                if n["id"] not in nodes:
+                    nodes[n["id"]] = {
+                        "id": n["id"],
+                        "label": n["label"],
+                        "type": n["type"],
+                        "color": n["color"],
+                    }
+                m = record["m"]
+                if m["id"] not in nodes:
+                    nodes[m["id"]] ={
+                        "id": m["id"],
+                        "label": m["label"],
+                        "type": m["type"],
+                        "color": m["color"],
+                    }
+                r = record["r"]
+                edges.append({
+                    "source": n["id"],
+                    "target": m["id"],
+                    "type": r["original_type"], # Usamos el nombre legible
+                    "evidence": r["evidence"],
+                    "confidence": r["confidence"]
+                })
+            return {"nodes": list(nodes.values()), "edges": edges}
 
     def save_graph(self, nodes, edges):
         with self.driver.session() as session:
-            # 1. Guardar Nodos: Si no existe lo crea, si existe lo actualiza (MERGE)
             for node in nodes:
                 session.run("""
                     MERGE (n:Entity {id: $id})
                     SET n.label = $label, n.type = $type, n.color = $color
                 """, id=node.id, label=node.label, type=node.type, color=node.color)
 
-            # 2. Guardar Relaciones: Conecta los puntos
             for edge in edges:
                 session.run("""
                     MATCH (a:Entity {id: $source})
@@ -39,5 +69,4 @@ class GraphDB:
                 evidence=edge.evidence, 
                 confidence=edge.confidence)
 
-# Instancia global para usar en las rutas
 db = GraphDB()
