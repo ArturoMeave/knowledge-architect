@@ -1,52 +1,53 @@
 import os
+import logging
 from neo4j import AsyncGraphDatabase
 from dotenv import load_dotenv
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
 class GraphDB:
     def __init__(self):
-        self.driver = AsyncGraphDatabase.driver(
-            os.getenv("NEO4J_URI"),
-            auth=(os.getenv("NEO4J_USER"), os.getenv("NEO4J_PASSWORD"))
-        )
+        self.uri = os.getenv("NEO4J_URI")
+        self.user = os.getenv("NEO4J_USER")
+        self.password = os.getenv("NEO4J_PASSWORD")
+        self.driver = None
 
-    async def close(self):
-        await self.driver.close()
-    
+    async def connect(self):
+        if not self.driver:
+            self.driver = AsyncGraphDatabase.driver(self.uri, auth=(self.user, self.password))
+            logger.info("Conexión con Neo4j establecida correctamente.")
+
     async def init_db(self):
         async with self.driver.session() as session:
             await session.run("CREATE INDEX IF NOT EXISTS FOR (n:Entity) ON (n.id)")
+            logger.info("Índices de base de datos verificados.")
+
+    async def close(self):
+        if self.driver:
+            await self.driver.close()
+            logger.info("Conexión cerrada de forma segura.")
     
     async def get_graph_data(self):
         async with self.driver.session() as session:
-            result = await session.run("MATCH (n)-[r]->(m) RETURN n, r, m")
-            records = await result.data()
+            result = await session.run("MATCH (n:Entity)-[r]->(m:Entity) RETURN n, r, m")
             nodes = {}
             edges = []
 
-            for record in records:
-                n = record["n"]
-                if n["id"] not in nodes:
-                    nodes[n["id"]] = {
-                        "id": n["id"],
-                        "label": n["label"],
-                        "type": n["type"],
-                        "color": n["color"],
-                    }
-                m = record["m"]
-                if m["id"] not in nodes:
-                    nodes[m["id"]] ={
-                        "id": m["id"],
-                        "label": m["label"],
-                        "type": m["type"],
-                        "color": m["color"],
-                    }
-                r = record["r"]
+            async for record in result:
+                n, m, r = record["n"], record["m"], record["r"]
+                if n["id"] not in nodes: nodes[n["id"]] = dict(n)
+                if m["id"] not in nodes: nodes[m["id"]] = dict(m)
+
                 edges.append({
                     "source": n["id"],
                     "target": m["id"],
-                    "type": r["original_type"], # Usamos el nombre legible
+                    "type": r["original_type"],
                     "evidence": r["evidence"],
                     "confidence": r["confidence"]
                 })
@@ -54,24 +55,32 @@ class GraphDB:
 
     async def save_graph(self, nodes, edges):
         async with self.driver.session() as session:
-            for node in nodes:
-                await session.run("""
-                    MERGE (n:Entity {id: $id})
-                    SET n.label = $label, n.type = $type, n.color = $color
-                """, id=node.id, label=node.label, type=node.type, color=node.color)
+            nodes_data = [{"id": n.id, "label": n.label, "type": n.type, "color": n.color} for n in nodes]
+            await session.run("""
+                UNWIND $nodes AS node_data
+                MERGE (n:Entity {id: node_data.id})
+                SET n.label = node_data.label, n.type = node_data.type, n.color = node_data.color
+            """, nodes=nodes_data)
 
-            for edge in edges:
-                await session.run("""
-                    MATCH (a:Entity {id: $source})
-                    MATCH (b:Entity {id: $target})
-                    MERGE (a)-[r:RELATED {type: $rel_type}]->(b)
-                    SET r.evidence = $evidence, r.confidence = $confidence, r.original_type = $original_type
-                """, 
-                source=edge.source, 
-                target=edge.target, 
-                rel_type=edge.type.upper().replace(" ", "_"),
-                original_type=edge.type,
-                evidence=edge.evidence, 
-                confidence=edge.confidence)
+            rels_data = [
+                {
+                    "source": e.source,
+                    "target": e.target,
+                    "rel_type": e.type.upper().replace(" ", "_"),
+                    "original_type": e.type,
+                    "evidence": e.evidence,
+                    "confidence": e.confidence
+                } for e in edges
+            ]
+            await session.run("""
+                UNWIND $rels AS rel_data
+                MATCH (a:Entity {id: rel_data.source})
+                MATCH (b:Entity {id: rel_data.target})
+                MERGE (a)-[r:RELATED {type: rel_data.rel_type}]->(b)
+                SET r.evidence = rel_data.evidence, 
+                    r.confidence = rel_data.confidence, 
+                    r.original_type = rel_data.original_type
+            """, rels=rels_data)
+            logger.info(f"Guardado masivo completado: {len(nodes)} nodos.")
 
 db = GraphDB()
