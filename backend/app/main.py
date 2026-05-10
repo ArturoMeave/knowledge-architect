@@ -3,12 +3,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import ingest, graph
 from app.database import db
+from app.database_users import Base, engine
 from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await db.connect()   
     await db.init_db()   
+    Base.metadata.create_all(bind=engine)
     yield
     await db.close()    
 
