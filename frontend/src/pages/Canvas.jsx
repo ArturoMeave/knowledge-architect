@@ -1,30 +1,38 @@
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 import { Search, ZoomIn, ZoomOut, Maximize, X, FileText, Activity } from 'lucide-react';
 
 export default function Canvas() {
-    const [selectedNode, setSelectedNode] = useState(null);
+  const [graphData, setGraphData] = useState({ nodes: [], links: [] });
+  const [selectedNode, setSelectedNode] = useState(null);
 
-    //datos de prueba
-    const graphData = useMemo(() => ({
-        nodes: [
-      { id: '1', name: 'Strategic Roadmap', type: 'STRATEGY', val: 20 },
-      { id: '2', name: 'Global Market Expansion', type: 'ENTITY', val: 15 },
-      { id: '3', name: 'Protocol Alpha', type: 'PROTOCOL', val: 12 },
-      { id: '4', name: 'Acme Corp', type: 'COMPANY', val: 18 },
-      { id: '5', name: 'Q3 Earnings', type: 'EVENT', val: 10 },
-    ],
-    links: [
-      { source: '1', target: '2' },
-      { source: '2', target: '4' },
-      { source: '1', target: '3' },
-      { source: '4', target: '5' },
-    ] 
-  }), [])
+  useEffect(() => {
+    const fetchGraph = async () => {
+      const token = localStorage.getItem('token');
+      try {
+        const response = await fetch('http://127.0.0.1:8000/graph/data', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await response.json();
+        
+        // Mapeamos label a name y añadimos un tamaño visual base (val)
+        const formattedNodes = data.nodes.map(n => ({
+          ...n,
+          name: n.label, 
+          val: 15        
+        }));
+
+        setGraphData({ nodes: formattedNodes, links: data.edges });
+      } catch (error) {
+        console.error("Error al cargar el grafo:", error);
+      }
+    };
+    fetchGraph();
+  }, []);
 
   return (
     <div className="h-screen flex flex-col overflow-hidden relative">
-      {/* Barra de Herramientas Superior */}
+      {/* Herramientas */}
       <div className="absolute top-6 left-6 right-6 z-10 flex justify-between items-center pointer-events-none">
         <div className="flex gap-2 pointer-events-auto">
           <div className="bg-white border border-blueprint-grid rounded-md flex items-center px-3 py-2 shadow-sm">
@@ -39,17 +47,16 @@ export default function Canvas() {
         </div>
       </div>
 
-      {/* El Lienzo del Grafo */}
+      {/* El Grafo */}
       <div className="flex-1 bg-blueprint-bg cursor-grab active:cursor-grabbing">
         <ForceGraph2D
           graphData={graphData}
           nodeLabel="name"
-          nodeColor={node => node.type === 'STRATEGY' ? '#0052cc' : '#94a3b8'}
+          nodeColor={node => node.color || (node.type === 'STRATEGY' ? '#0052cc' : '#94a3b8')}
           nodeRelSize={6}
           linkColor={() => '#e5e7eb'}
           linkWidth={1.5}
           onNodeClick={(node) => setSelectedNode(node)}
-          // Aquí dibujamos los nodos como cajitas de Stich
           nodeCanvasObject={(node, ctx, globalScale) => {
             const label = node.name;
             const fontSize = 12 / globalScale;
@@ -58,7 +65,7 @@ export default function Canvas() {
             const bckgDimensions = [textWidth, fontSize].map(n => n + fontSize * 0.5);
 
             ctx.fillStyle = 'white';
-            ctx.strokeStyle = node.type === 'STRATEGY' ? '#0052cc' : '#e5e7eb';
+            ctx.strokeStyle = node.color || (node.type === 'STRATEGY' ? '#0052cc' : '#e5e7eb');
             ctx.lineWidth = 2 / globalScale;
             ctx.beginPath();
             ctx.roundRect(node.x - bckgDimensions[0] / 2, node.y - bckgDimensions[1] / 2, ...bckgDimensions, 2 / globalScale);
@@ -73,7 +80,7 @@ export default function Canvas() {
         />
       </div>
 
-      {/* Panel de Inspección (Deep Inspection) - Se desliza desde la derecha */}
+      {/* Panel de Inspección Dinámico */}
       {selectedNode && (
         <div className="absolute top-0 right-0 w-96 h-full bg-white border-l border-blueprint-grid shadow-2xl z-20 animate-in slide-in-from-right duration-300">
           <div className="p-6 h-full flex flex-col">
@@ -89,37 +96,29 @@ export default function Canvas() {
 
             <div className="space-y-6 flex-1 overflow-auto">
               <div className="bg-blueprint-bg p-4 rounded-md border border-blueprint-grid">
-                <p className="text-[10px] font-mono text-gray-400 uppercase mb-2">Source Evidence</p>
+                <p className="text-[10px] font-mono text-gray-400 uppercase mb-2">Entity Context</p>
                 <p className="text-sm text-gray-600 italic leading-relaxed">
-                  "The expansion into APAC markets will necessitate a complete restructuring of our supply chain logistics, focusing on Sector 7..."
+                  Sistema identificado como entidad de tipo <strong>{selectedNode.type}</strong> dentro de tu grafo de conocimiento privado.
                 </p>
                 <button className="mt-4 flex items-center gap-2 text-blueprint-blue text-xs font-bold hover:underline">
-                  <FileText size={14} /> VIEW ORIGINAL PDF (PG. 12)
+                  <FileText size={14} /> VIEW SOURCE DETAILS
                 </button>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-3 border border-blueprint-grid rounded">
-                  <p className="text-[10px] font-mono text-gray-400 uppercase">Entity Type</p>
+                  <p className="text-[10px] font-mono text-gray-400 uppercase">Type</p>
                   <p className="text-sm font-bold text-gray-800">{selectedNode.type}</p>
                 </div>
                 <div className="p-3 border border-blueprint-grid rounded">
-                  <p className="text-[10px] font-mono text-gray-400 uppercase">Confidence</p>
-                  <p className="text-sm font-bold text-green-600">98.4%</p>
+                  <p className="text-[10px] font-mono text-gray-400 uppercase">Database ID</p>
+                  <p className="text-sm font-bold text-blue-600 font-mono truncate">{selectedNode.id}</p>
                 </div>
               </div>
-            </div>
-
-            <div className="pt-6 border-t border-blueprint-grid">
-              <button className="w-full bg-gray-900 text-white py-3 rounded font-bold text-xs uppercase tracking-widest flex items-center justify-center gap-2">
-                <Activity size={16} /> Run Connection Analysis
-              </button>
             </div>
           </div>
         </div>
       )}
     </div>
   );
-
-  
 }

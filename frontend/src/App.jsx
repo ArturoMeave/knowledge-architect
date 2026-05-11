@@ -6,7 +6,8 @@ import Dashboard from './pages/Dashboard';
 import Uploads from './pages/Uploads';
 import Canvas from './pages/Canvas';
 import Library from './pages/Library';
-
+import { AuthProvider } from './context/AuthContext';
+import { ProtectedRoute } from './components/ProtectedRoute';
 
 function LayoutWrapper({ children }) {
   const location = useLocation();
@@ -22,27 +23,26 @@ function LayoutWrapper({ children }) {
   );
 }
 
-const Placeholder = ({ name }) => (
-  <div className="flex-1 flex items-center justify-center">
-    <h2 className="text-2xl font-mono text-gray-300">Sección {name} en construcción...</h2>
-  </div>
-);
-
 function App() {
   return (
-    <Router>
-      <LayoutWrapper>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/auth" element={<Auth />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/canvas" element={<Canvas />} />
-          <Route path="/uploads" element={<Uploads />} />
-          <Route path="/library" element={<Library />} />
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
-      </LayoutWrapper>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <LayoutWrapper>
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/auth" element={<Auth />} />
+            
+            {/* Rutas Protegidas */}
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/canvas" element={<ProtectedRoute><Canvas /></ProtectedRoute>} />
+            <Route path="/uploads" element={<ProtectedRoute><Uploads /></ProtectedRoute>} />
+            <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
+            
+            <Route path="*" element={<Navigate to="/" />} />
+          </Routes>
+        </LayoutWrapper>
+      </Router>
+    </AuthProvider>
   );
 }
 
