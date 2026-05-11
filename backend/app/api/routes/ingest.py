@@ -8,6 +8,7 @@ from app.services.chunker import chunk_text
 from app.services.extraction import extract_knowledge_from_chunks
 from app.database import db
 from app.api.deps import get_current_user
+from app.models.user import User # <--- IMPORTANTE: Importamos el modelo de Usuario
 
 router = APIRouter(
     prefix="/ingest", 
@@ -18,19 +19,14 @@ CONCURRENCY_LIMIT = int(os.getenv("GROQ_CONCURRENCY_LIMIT", "5"))
 semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
 
 async def process_chunk_safe(chunk: str, final_nodes: dict, all_relations: list):
-    """
-    Procesa un trozo de texto de forma segura y controlada.
-    """
     async with semaphore:
         try:
             graph_data = await extract_knowledge_from_chunks(chunk)
-            
             for node in graph_data.entities:
                 unique_id = node.label.lower().replace(" ", "_")
                 if unique_id not in final_nodes:
                     node.id = unique_id
                     final_nodes[unique_id] = node
-            
             for rel in graph_data.relations:
                 rel.source = rel.source_label.lower().replace(" ", "_")
                 rel.target = rel.target_label.lower().replace(" ", "_")
@@ -39,10 +35,7 @@ async def process_chunk_safe(chunk: str, final_nodes: dict, all_relations: list)
             print(f"Error procesando un trozo (chunk): {e}")
 
 @router.post("/upload")
-async def upload_pdf(file: UploadFile = File(...)):
-    """
-    Punto de entrada principal para subir y procesar PDFs.
-    """
+async def upload_pdf(file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
     if file.content_type != "application/pdf":
         raise HTTPException(status_code=400, detail="El archivo debe ser un PDF válido")
 
@@ -55,7 +48,6 @@ async def upload_pdf(file: UploadFile = File(...)):
             pages = extract_pdf_pages(temp_pdf_path)
             full_text = "\n".join([p.text for p in pages])
             chunks = chunk_text(full_text)
-
             final_nodes = {}
             all_relations = []
 
@@ -65,7 +57,8 @@ async def upload_pdf(file: UploadFile = File(...)):
             nodes_list = list(final_nodes.values())
 
             try:
-                await db.save_graph(nodes_list, all_relations)
+                # CORRECCIÓN AQUÍ: Ahora le pasamos el ID del usuario logueado
+                await db.save_graph(nodes_list, all_relations, user_id=current_user.id)
             except Exception as e:
                 raise HTTPException(status_code=500, detail=f"Error en la base de datos Neo4j: {str(e)}")
 
@@ -77,11 +70,9 @@ async def upload_pdf(file: UploadFile = File(...)):
                     "edges": all_relations,
                 }
             }
-
         finally:
             if os.path.exists(temp_pdf_path):
                 os.remove(temp_pdf_path)
-
     except HTTPException:
         raise
     except Exception as e:
