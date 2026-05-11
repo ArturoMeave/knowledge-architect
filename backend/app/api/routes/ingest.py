@@ -7,9 +7,12 @@ from app.services.pdf_reader import extract_pdf_pages
 from app.services.chunker import chunk_text
 from app.services.extraction import extract_knowledge_from_chunks
 from app.database import db
-from app.api.security import get_api_key
+from app.api.deps import get_current_user
 
-router = APIRouter(prefix="/ingest", tags=["Ingestión"], dependencies=[Depends(get_api_key)])
+router = APIRouter(
+    prefix="/ingest", 
+    tags=["Ingestión"], 
+    dependencies=[Depends(get_current_user)])
 
 CONCURRENCY_LIMIT = int(os.getenv("GROQ_CONCURRENCY_LIMIT", "5"))
 semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
