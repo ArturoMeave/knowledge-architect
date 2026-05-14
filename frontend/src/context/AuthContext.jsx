@@ -12,6 +12,12 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
+  const logout = () => {
+    localStorage.removeItem('token');
+    setUser(null);
+    window.location.href = '/';
+  }
+
   return (
     <AuthContext.Provider value={{ user, setUser, loading }}>
       {!loading && children}

@@ -2,7 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'r
 import Sidebar from './layouts/Sidebar';
 import Landing from './pages/Landing';
 import Auth from './pages/Auth'; 
-import Dashboard from './pages/Dashboard';
+
 import Uploads from './pages/Uploads';
 import Canvas from './pages/Canvas';
 import Library from './pages/Library';
@@ -33,7 +33,7 @@ function App() {
             <Route path="/auth" element={<Auth />} />
             
             {/* Rutas Protegidas */}
-            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+
             <Route path="/canvas" element={<ProtectedRoute><Canvas /></ProtectedRoute>} />
             <Route path="/uploads" element={<ProtectedRoute><Uploads /></ProtectedRoute>} />
             <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />

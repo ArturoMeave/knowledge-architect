@@ -1,10 +1,14 @@
 import { useState } from 'react';
 import { ArrowRight, Lock, Mail, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+// ESTA ES LA LÍNEA QUE FALTABA:
+import { useAuth } from '../context/AuthContext'; 
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
   const navigate = useNavigate();
+  // Ahora el sistema ya sabe qué es useAuth
+  const { setUser } = useAuth(); 
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,7 +31,10 @@ export default function Auth() {
         const data = await response.json();
         if (response.ok) {
           localStorage.setItem('token', data.access_token);
-          navigate('/dashboard');
+          // Avisamos al sistema de que el usuario ya entró
+          setUser({ loggedIn: true }); 
+          // Redirigimos a Uploads porque Dashboard ya no existe
+          navigate('/uploads'); 
         } else {
           alert(data.detail || "Error en el acceso");
         }
