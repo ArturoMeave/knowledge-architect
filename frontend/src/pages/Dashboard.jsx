@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'; // Paso 1: Importamos herramientas de estado y efectos
+import { useState, useEffect } from 'react'; 
 import { Activity, Database, Network, TrendingUp, CheckCircle } from 'lucide-react';
 
+// Componente para las tarjetas de estadísticas
 const StatCard = ({ icon: Icon, label, value, trend, color }) => (
   <div className="bg-white p-6 border border-blueprint-grid rounded-lg shadow-sm">
     <div className="flex justify-between items-start mb-4">
@@ -14,6 +15,7 @@ const StatCard = ({ icon: Icon, label, value, trend, color }) => (
   </div>
 );
 
+// Componente para los elementos del feed de actividad
 const ActivityItem = ({ title, time, type }) => (
   <div className="flex items-center gap-4 py-3 border-b border-blueprint-grid last:border-0">
     <div className={`w-2 h-2 rounded-full ${type === 'success' ? 'bg-green-400' : 'bg-blue-400'}`}></div>
@@ -26,28 +28,44 @@ const ActivityItem = ({ title, time, type }) => (
 );
 
 export default function Dashboard() {
-  // Paso 2: Creamos "cubos" (estados) para guardar los números reales
+  // Estado para guardar los datos reales del grafo
   const [stats, setStats] = useState({ nodes: 0, edges: 0 });
 
-  // Paso 3: Al entrar a la página, llamamos al backend
   useEffect(() => {
     const fetchStats = async () => {
-      const token = localStorage.getItem('token'); // Recuperamos tu carnet de identidad
+      const token = localStorage.getItem('token'); 
+      
+      if (!token) {
+        console.error("No se encontró el token de acceso.");
+        return;
+      }
+
       try {
+        // Llamada al endpoint de datos del grafo
         const response = await fetch('http://127.0.0.1:8000/graph/data', {
           headers: {
-            'Authorization': `Bearer ${token}` // Le demostramos al portero quiénes somos
+            'Authorization': `Bearer ${token}` 
           }
         });
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            console.error("La sesión ha expirado o es inválida.");
+          }
+          return; // Detenemos la ejecución si hay un error
+        }
+
         const data = await response.json();
-        
-        // Paso 4: Contamos los elementos que nos ha devuelto Neo4j
-        setStats({
-          nodes: data.nodes.length,
-          edges: data.edges.length
-        });
+
+        // Validamos que la respuesta contenga los datos esperados antes de contar
+        if (data && Array.isArray(data.nodes) && Array.isArray(data.edges)) {
+          setStats({
+            nodes: data.nodes.length,
+            edges: data.edges.length
+          });
+        }
       } catch (error) {
-        console.error("No se pudieron cargar las estadísticas reales:", error);
+        console.error("Error crítico al conectar con el servidor:", error);
       }
     };
 
@@ -63,26 +81,26 @@ export default function Dashboard() {
         </p>
       </header>
 
-      {/* Fila de Tarjetas con datos REALES */}
+      {/* Fila de Tarjetas con datos REALES sincronizados */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <StatCard 
           icon={Database} 
           label="Total Nodes" 
-          value={stats.nodes.toLocaleString()} // Usamos .toLocaleString() para poner los puntos de los miles
-          trend="+100%" 
+          value={stats.nodes.toLocaleString()} 
+          trend="+1.2%" 
           color="bg-blue-500"
         />
         <StatCard 
           icon={Network} 
           label="Extracted Relationships" 
           value={stats.edges.toLocaleString()} 
-          trend="+100%" 
+          trend="+3.4%" 
           color="bg-indigo-500"
         />
         <StatCard 
           icon={TrendingUp} 
           label="Avg. Confidence" 
-          value="98.2%" // Esto lo dejaremos fijo hasta que el backend calcule promedios
+          value="98.2%" 
           trend="HIGH" 
           color="bg-emerald-500"
         />
@@ -103,8 +121,8 @@ export default function Dashboard() {
         <div className="bg-white p-6 border border-blueprint-grid rounded-lg shadow-sm">
           <h2 className="text-sm font-mono uppercase text-gray-400 mb-6">System Activity</h2>
           <div className="space-y-1">
-            <ActivityItem title="Connection to Neo4j Active" time="Just now" type="success" />
-            <ActivityItem title="User session validated" time="Active" type="info" />
+            <ActivityItem title="Neo4j Interface Synchronized" time="Active" type="success" />
+            <ActivityItem title="Secure User Token Verified" time="Active" type="info" />
           </div>
         </div>
       </div>

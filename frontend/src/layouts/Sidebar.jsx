@@ -1,40 +1,80 @@
-import {LayoutDashboard, Network, UploadCloud, Library, Settings} from 'lucide-react';
-import {Link, useLocation} from 'react-router-dom';
+import { LayoutDashboard, Network, UploadCloud, Library, Settings, LogOut } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext.jsx'; //
 
-const SidebarItem = ({icon: Icon, to, active}) => (
-    <Link
-      to={to}
-      className={`flex items-center gap-3 px-4 py-3 rounded-md transition-all ${
+// Componente para los elementos individuales del menú
+const SidebarItem = ({ icon: Icon, to, label, active }) => (
+  <Link
+    to={to}
+    className={`flex items-center gap-3 px-4 py-3 rounded-md transition-all ${
       active 
         ? 'bg-blueprint-blue text-white shadow-md' 
         : 'text-gray-500 hover:bg-gray-100'
     }`}
-    >
-      <Icon className="w-5 h-5" />
-      <span className="font-medium">{to.charAt(0).toUpperCase() + to.slice(1)}</span>
-    </Link>
-  );
-  
-export default function Sidebar(){
-    const location = useLocation();
+  >
+    <Icon className="w-5 h-5" />
+    <span className="font-medium">{label}</span>
+  </Link>
+);
 
-    return(
-        <aside className="w-64 border-r border-blueprint-grid h-screen sticky top-0 bg-white/80 backdrop-blur-sm flex flex-col p-4">
+export default function Sidebar() {
+  const location = useLocation();
+  const { logout } = useAuth(); // Extraemos la función de cierre de sesión
+
+  return (
+    <aside className="w-64 border-r border-blueprint-grid h-screen sticky top-0 bg-white/80 backdrop-blur-sm flex flex-col p-4">
+      {/* Cabecera del Sistema */}
       <div className="mb-10 px-2">
-        <h2 className="text-blueprint-blue font-bold text-lg font-mono">KNOWLEDGE ARCHITECT</h2>
+        <h2 className="text-blueprint-blue font-bold text-lg font-mono tracking-tighter">KNOWLEDGE ARCHITECT</h2>
         <p className="text-[10px] text-gray-400 font-mono">V1.0.0-STABLE</p>
       </div>
 
+      {/* Navegación Principal */}
       <nav className="flex flex-col gap-2 flex-1">
-        <SidebarItem icon={LayoutDashboard} label="Dashboard" to="/dashboard" active={location.pathname === '/dashboard'} />
-        <SidebarItem icon={Network} label="Knowledge Canvas" to="/canvas" active={location.pathname === '/canvas'} />
-        <SidebarItem icon={UploadCloud} label="Uploads" to="/uploads" active={location.pathname === '/uploads'} />
-        <SidebarItem icon={Library} label="Library" to="/library" active={location.pathname === '/library'} />
+        <SidebarItem 
+          icon={LayoutDashboard} 
+          label="Dashboard" 
+          to="/dashboard" 
+          active={location.pathname === '/dashboard'} 
+        />
+        <SidebarItem 
+          icon={Network} 
+          label="Knowledge Canvas" 
+          to="/canvas" 
+          active={location.pathname === '/canvas'} 
+        />
+        <SidebarItem 
+          icon={UploadCloud} 
+          label="Uploads" 
+          to="/uploads" 
+          active={location.pathname === '/uploads'} 
+        />
+        <SidebarItem 
+          icon={Library} 
+          label="Library" 
+          to="/library" 
+          active={location.pathname === '/library'} 
+        />
       </nav>
 
-      <div className="pt-4 border-t border-blueprint-grid">
-        <SidebarItem icon={Settings} label="Settings" to="/settings" active={location.pathname === '/settings'} />
+      {/* Acciones de Cuenta y Configuración */}
+      <div className="pt-4 border-t border-blueprint-grid space-y-2">
+        <SidebarItem 
+          icon={Settings} 
+          label="Settings" 
+          to="/settings" 
+          active={location.pathname === '/settings'} 
+        />
+        
+        {/* Botón de Logout Real */}
+        <button 
+          onClick={logout} 
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-md text-red-500 hover:bg-red-50 transition-all font-medium"
+        >
+          <LogOut className="w-5 h-5" />
+          <span>Sign Out</span>
+        </button>
       </div>
     </aside>
-    );
+  );
 }
