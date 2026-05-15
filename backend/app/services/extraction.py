@@ -15,39 +15,39 @@ client = AsyncOpenAI(
 @retry(stop=stop_after_attempt(3), wait=wait_fixed(2))
 async def extract_knowledge_from_chunks(chunk: str, level: str, tone: str, language: str, specs: str = ""):
     """
-    Extrae conocimiento y un resumen narrativo personalizado.
+    Transforma un trozo de texto en un SET DE ESTUDIO COMPLETO (Mapa, Resumen, Flashcards, Quiz).
     """
     
     level_instruction = {
-        "1": "Conceptos fundamentales y definiciones claras.",
-        "2": "Análisis profundo conectando causas y consecuencias.",
-        "3": "Síntesis experta con terminología avanzada y relaciones complejas.",
+        "1": "Nivel Básico: Conceptos clave y definiciones directas.",
+        "2": "Nivel Intermedio: Análisis detallado con causas y consecuencias.",
+        "3": "Nivel Avanzado: Síntesis profunda para nivel universitario/experto."
     }.get(level, "2")
 
-    tone_instruction = {
-        "academic": "Lenguaje formal y estructurado de profesor universitario.",
-        "friendly": "Analogías sencillas como un compañero de clase.",
-        "simple": "Lenguaje muy simple y directo (ELI5)."
-    }.get(tone, "academic")
-
     system_prompt = f"""
-    Eres un experto en diseño de mapas mentales educativos. 
-    Tu misión es transformar el texto en una estructura de árbol jerárquica.
+    Eres el motor de una plataforma EdTech de alto nivel. 
+    Tu misión es transformar el texto proporcionado en un SET DE ESTUDIO COMPLETO.
 
-    REGLA DE ERO: Responde con un JSON que defina:
-    1. Un único nodo 'CENTRAL' (el tema principal).
-    2. Varias ramas 'BRANCH' conectadas al centro.
-    3. 'SUB_BRANCH' conectadas a las ramas.
-    
-    CADA NODO debe tener un campo 'summary' con una explicación detallada de ese punto específico.
+    INSTRUCCIONES DE PERSONALIZACIÓN:
+    - Idioma: {language}
+    - Nivel: {level_instruction}
+    - Tono: {tone}
+    - Notas extra: {specs}
 
-    JSON FORMAT:
+    DEBES GENERAR UN JSON EXACTO QUE INCLUYA ESTAS 5 SECCIONES:
+    1. 'entities': Nodos jerárquicos ('CENTRAL', 'BRANCH', 'SUB_BRANCH') con un 'summary' detallado para cada uno.
+    2. 'relations': Conexiones lógicas entre los nodos.
+    3. 'global_summary': Un resumen escrito estructurado en bullet points HTML (<ul><li>...</li></ul>).
+    4. 'flashcards': Mínimo 4 tarjetas de doble cara (front/back) para ayudar a memorizar.
+    5. 'quiz': Mínimo 3 preguntas de autoevaluación con 4 opciones y la respuesta correcta.
+
+    ESTRUCTURA OBLIGATORIA DEL JSON (No uses markdown, solo el JSON puro):
     {{
-      "entities": [
-        {{"id": "c1", "label": "Tema Central", "type": "CENTRAL", "summary": "..."}},
-        {{"id": "b1", "label": "Rama 1", "type": "BRANCH", "summary": "..."}}
-      ],
-      "relations": [ {{"source": "c1", "target": "b1", "type": "contiene"}} ]
+      "entities": [ {{"id": "c1", "label": "Tema Central", "type": "CENTRAL", "summary": "..."}} ],
+      "relations": [ {{"source": "c1", "target": "b1", "type": "contiene", "evidence": "..."}} ],
+      "global_summary": "<ul><li>Punto fundamental 1...</li></ul>",
+      "flashcards": [ {{"front": "Pregunta o término", "back": "Respuesta o definición"}} ],
+      "quiz": [ {{"question": "Pregunta de prueba", "options": ["Opción A","Opción B","Opción C","Opción D"], "correct_answer": "Opción correcta exacta", "explanation": "Por qué es correcta"}} ]
     }}
     """
 
@@ -55,7 +55,7 @@ async def extract_knowledge_from_chunks(chunk: str, level: str, tone: str, langu
         model="llama-3.3-70b-versatile",
         messages=[
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Analiza este texto: \n\n{chunk}"}
+            {"role": "user", "content": f"Genera el Set de Estudio para este texto: \n\n{chunk}"}
         ],
         response_format={"type": "json_object"}
     )
@@ -63,9 +63,11 @@ async def extract_knowledge_from_chunks(chunk: str, level: str, tone: str, langu
     raw_content = completion.choices[0].message.content
     data = json.loads(raw_content)
 
-    # Validaciones de seguridad para que el sistema no rompa
-    if "entities" not in data: data["entities"] = []
-    if "relations" not in data: data["relations"] = []
-    if "summary" not in data: data["summary"] = ""
+    # Validaciones de seguridad: Si la IA olvida algo, le ponemos una lista vacía para no romper el programa
+    for key in ["entities", "relations", "flashcards", "quiz"]:
+        if key not in data: 
+            data[key] = []
+    if "global_summary" not in data: 
+        data["global_summary"] = ""
 
     return ExtractionPayload(**data)
