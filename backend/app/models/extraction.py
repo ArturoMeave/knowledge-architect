@@ -6,6 +6,7 @@ class ExtractEntity(BaseModel):
     label: str
     type: str
     color: Optional[str] = "#3b82f6"
+    summary: Optional[str] = "Sin descripción disponible."
 
 class ExtractRelation(BaseModel):
     source: str
@@ -14,7 +15,7 @@ class ExtractRelation(BaseModel):
     target_label: str
     type: str
     evidence: str
-    confidence: float = Field(default=1.0, ge=0, le=1)
+    confidence: float = Field(default=1.0, ge=0, let=1)
 
 class ExtractionPayload(BaseModel):
     entities: List[ExtractEntity]

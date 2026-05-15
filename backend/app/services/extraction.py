@@ -15,47 +15,39 @@ client = AsyncOpenAI(
 @retry(stop=stop_after_attempt(3), wait=wait_fixed(2))
 async def extract_knowledge_from_chunks(chunk: str, level: str, tone: str, language: str, specs: str = ""):
     """
-    Extrae conocimiento personalizado según el nivel, tono e instrucciones del estudiante.
+    Extrae conocimiento y un resumen narrativo personalizado.
     """
     
     level_instruction = {
-        "1": "Proporciona conceptos fundamentales y definiciones claras.",
-        "2": "Proporciona un análisis profundo conectando causas y consecuencias.",
-        "3": "Crea una síntesis experta con terminología avanzada y relaciones complejas.",
+        "1": "Conceptos fundamentales y definiciones claras.",
+        "2": "Análisis profundo conectando causas y consecuencias.",
+        "3": "Síntesis experta con terminología avanzada y relaciones complejas.",
     }.get(level, "2")
 
     tone_instruction = {
-        "academic": "Usa un lenguaje formal, técnico y estructurado como un profesor de universidad.",
-        "friendly": "Explica de forma cercana, usando analogías sencillas como un compañero de clase.",
-        "simple": "Explica como si tuviera 5 años (ELI5), usando el lenguaje más simple y al grano posible."
+        "academic": "Lenguaje formal y estructurado de profesor universitario.",
+        "friendly": "Analogías sencillas como un compañero de clase.",
+        "simple": "Lenguaje muy simple y directo (ELI5)."
     }.get(tone, "academic")
 
     system_prompt = f"""
-    Eres un experto en pedagogía y extracción de grafos de conocimiento. 
-    Tu misión es identificar entidades y relaciones a partir del texto y generar un resumen visual.
+    Eres un experto en diseño de mapas mentales educativos. 
+    Tu misión es transformar el texto en una estructura de árbol jerárquica.
 
-    INSTRUCCIONES DE PERSONALIZACIÓN:
-    - Idioma de respuesta: {language}
-    - Nivel de profundidad: {level_instruction}
-    - Tono de la explicación: {tone_instruction}
-    - Especificaciones adicionales: {specs}
+    REGLA DE ERO: Responde con un JSON que defina:
+    1. Un único nodo 'CENTRAL' (el tema principal).
+    2. Varias ramas 'BRANCH' conectadas al centro.
+    3. 'SUB_BRANCH' conectadas a las ramas.
+    
+    CADA NODO debe tener un campo 'summary' con una explicación detallada de ese punto específico.
 
-    REGLA DE ORO: Responde ÚNICAMENTE con un JSON que use estas llaves exactas:
+    JSON FORMAT:
     {{
       "entities": [
-        {{"id": "unique_id", "label": "Concepto", "type": "Tipo", "color": "#hex"}}
+        {{"id": "c1", "label": "Tema Central", "type": "CENTRAL", "summary": "..."}},
+        {{"id": "b1", "label": "Rama 1", "type": "BRANCH", "summary": "..."}}
       ],
-      "relations": [
-        {{
-          "source": "id_origen", 
-          "target": "id_destino", 
-          "source_label": "Nombre Origen", 
-          "target_label": "Nombre Destino", 
-          "type": "tipo_relacion", 
-          "evidence": "cita_del_texto", 
-          "confidence": 1.0
-        }}
-      ]
+      "relations": [ {{"source": "c1", "target": "b1", "type": "contiene"}} ]
     }}
     """
 
@@ -63,7 +55,7 @@ async def extract_knowledge_from_chunks(chunk: str, level: str, tone: str, langu
         model="llama-3.3-70b-versatile",
         messages=[
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"Analiza este texto y extrae el conocimiento: \n\n{chunk}"}
+            {"role": "user", "content": f"Analiza este texto: \n\n{chunk}"}
         ],
         response_format={"type": "json_object"}
     )
@@ -71,8 +63,9 @@ async def extract_knowledge_from_chunks(chunk: str, level: str, tone: str, langu
     raw_content = completion.choices[0].message.content
     data = json.loads(raw_content)
 
-    # Aseguramos que las llaves existan para evitar errores de validación
+    # Validaciones de seguridad para que el sistema no rompa
     if "entities" not in data: data["entities"] = []
     if "relations" not in data: data["relations"] = []
+    if "summary" not in data: data["summary"] = ""
 
     return ExtractionPayload(**data)

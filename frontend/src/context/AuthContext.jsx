@@ -1,6 +1,7 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useState, useEffect } from 'react';
 
-const AuthContext = createContext();
+// 1. Exportamos el "Almacén" para que el Hook pueda encontrarlo
+export const AuthContext = createContext(); 
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -19,10 +20,8 @@ export const AuthProvider = ({ children }) => {
   }
 
   return (
-    <AuthContext.Provider value={{ user, setUser, loading }}>
+    <AuthContext.Provider value={{ user, setUser, loading, logout }}>
       {!loading && children}
     </AuthContext.Provider>
   );
 };
-
-export const useAuth = () => useContext(AuthContext);

@@ -1,124 +1,137 @@
 import { useState, useEffect } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
-import { Search, ZoomIn, ZoomOut, Maximize, X, FileText, Activity } from 'lucide-react';
+import { FileText, Layers, Download, Trash2, BookOpen, MousePointer2 } from 'lucide-react';
 
 export default function Canvas() {
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
   const [selectedNode, setSelectedNode] = useState(null);
+  const [viewMode, setViewMode] = useState('mindmap'); 
 
   useEffect(() => {
     const fetchGraph = async () => {
       const token = localStorage.getItem('token');
-      try {
-        const response = await fetch('http://127.0.0.1:8000/graph/data', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+      // Llamada al backend para obtener los datos jerárquicos
+      const response = await fetch('http://127.0.0.1:8000/graph/data', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
         const data = await response.json();
+        // Mapeamos los datos para que el grafo sepa quién es quién
+        setGraphData({
+          nodes: data.nodes.map(n => ({ ...n, name: n.label })),
+          links: data.edges
+        });
         
-        // Mapeamos label a name y añadimos un tamaño visual base (val)
-        const formattedNodes = data.nodes.map(n => ({
-          ...n,
-          name: n.label, 
-          val: 15        
-        }));
-
-        setGraphData({ nodes: formattedNodes, links: data.edges });
-      } catch (error) {
-        console.error("Error al cargar el grafo:", error);
+        // Seleccionamos el nodo central por defecto si existe
+        const central = data.nodes.find(n => n.type === 'CENTRAL');
+        if (central) setSelectedNode(central);
       }
     };
     fetchGraph();
   }, []);
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden relative">
-      {/* Herramientas */}
-      <div className="absolute top-6 left-6 right-6 z-10 flex justify-between items-center pointer-events-none">
-        <div className="flex gap-2 pointer-events-auto">
-          <div className="bg-white border border-blueprint-grid rounded-md flex items-center px-3 py-2 shadow-sm">
-            <Search size={16} className="text-gray-400 mr-2" />
-            <input type="text" placeholder="Query Graph..." className="bg-transparent outline-none text-xs font-mono w-48" />
-          </div>
+    <div className="h-screen flex flex-col bg-slate-50 overflow-hidden font-sans">
+      {/* HEADER: Herramientas de control */}
+      <header className="h-14 border-b border-blueprint-grid flex items-center justify-between px-6 shrink-0 bg-white z-20 shadow-sm">
+        <div className="flex items-center gap-4">
+          <h1 className="text-sm font-black font-mono uppercase tracking-widest text-blueprint-blue">Study_Mode_Active</h1>
         </div>
-        <div className="flex gap-2 pointer-events-auto bg-white border border-blueprint-grid rounded-md p-1 shadow-sm">
-          <button className="p-2 hover:bg-gray-100 rounded text-gray-500"><ZoomIn size={18} /></button>
-          <button className="p-2 hover:bg-gray-100 rounded text-gray-500"><ZoomOut size={18} /></button>
-          <button className="p-2 hover:bg-gray-100 rounded text-gray-500"><Maximize size={18} /></button>
+        <div className="flex gap-3">
+          <button className="p-2 text-slate-400 hover:text-blueprint-blue transition-colors" title="Exportar PDF"><Download size={18} /></button>
+          <button className="p-2 text-red-400 hover:text-red-600 transition-colors" title="Borrar Canvas"><Trash2 size={18} /></button>
         </div>
-      </div>
+      </header>
 
-      {/* El Grafo */}
-      <div className="flex-1 bg-blueprint-bg cursor-grab active:cursor-grabbing">
-        <ForceGraph2D
-          graphData={graphData}
-          nodeLabel="name"
-          nodeColor={node => node.color || (node.type === 'STRATEGY' ? '#0052cc' : '#94a3b8')}
-          nodeRelSize={6}
-          linkColor={() => '#e5e7eb'}
-          linkWidth={1.5}
-          onNodeClick={(node) => setSelectedNode(node)}
-          nodeCanvasObject={(node, ctx, globalScale) => {
-            const label = node.name;
-            const fontSize = 12 / globalScale;
-            ctx.font = `${fontSize}px Inter`;
-            const textWidth = ctx.measureText(label).width;
-            const bckgDimensions = [textWidth, fontSize].map(n => n + fontSize * 0.5);
+      {/* ÁREA DUAL: Mapa a la izquierda, Contenido a la derecha */}
+      <div className="flex-1 flex overflow-hidden">
+        
+        {/* PANEL IZQUIERDO: El Mapa Mental Jerárquico */}
+        <div className="w-3/5 relative border-r border-slate-200 bg-slate-50 shadow-inner">
+          <ForceGraph2D
+            graphData={graphData}
+            width={window.innerWidth * 0.6}
+            height={window.innerHeight - 56}
+            // CONFIGURACIÓN DE ÁRBOL: Esto evita las "bolas" y crea jerarquía
+            dagMode="radialout" // El tema central en medio y las ramas hacia afuera
+            dagLevelDistance={120}
+            backgroundColor="#f8fafc"
+            linkColor={() => '#cbd5e1'}
+            linkWidth={2}
+            nodeRelSize={7}
+            // DIBUJO PERSONALIZADO: Crea los "cuadritos" del mapa mental
+            nodeCanvasObject={(node, ctx, globalScale) => {
+              const label = node.name;
+              const fontSize = node.type === 'CENTRAL' ? 14/globalScale : 11/globalScale;
+              ctx.font = `${node.type === 'CENTRAL' ? '700' : '500'} ${fontSize}px Inter`;
+              const textWidth = ctx.measureText(label).width;
+              const bckgDimensions = [textWidth + 10, fontSize + 10];
 
-            ctx.fillStyle = 'white';
-            ctx.strokeStyle = node.color || (node.type === 'STRATEGY' ? '#0052cc' : '#e5e7eb');
-            ctx.lineWidth = 2 / globalScale;
-            ctx.beginPath();
-            ctx.roundRect(node.x - bckgDimensions[0] / 2, node.y - bckgDimensions[1] / 2, ...bckgDimensions, 2 / globalScale);
-            ctx.fill();
-            ctx.stroke();
+              // Sombra y estilo del "botón" de la rama
+              ctx.fillStyle = node.id === selectedNode?.id ? '#0052cc' : 'white';
+              ctx.shadowColor = 'rgba(0,0,0,0.05)';
+              ctx.shadowBlur = 5;
+              
+              ctx.beginPath();
+              ctx.roundRect(node.x - bckgDimensions[0] / 2, node.y - bckgDimensions[1] / 2, ...bckgDimensions, 5);
+              ctx.fill();
+              
+              if (node.id !== selectedNode?.id) {
+                ctx.strokeStyle = '#e2e8f0';
+                ctx.lineWidth = 1/globalScale;
+                ctx.stroke();
+              }
 
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillStyle = '#1e293b';
-            ctx.fillText(label, node.x, node.y);
-          }}
-        />
-      </div>
+              // Texto del concepto
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
+              ctx.fillStyle = node.id === selectedNode?.id ? 'white' : '#1e293b';
+              ctx.fillText(label, node.x, node.y);
+            }}
+            onNodeClick={(node) => setSelectedNode(node)}
+          />
+        </div>
 
-      {/* Panel de Inspección Dinámico */}
-      {selectedNode && (
-        <div className="absolute top-0 right-0 w-96 h-full bg-white border-l border-blueprint-grid shadow-2xl z-20 animate-in slide-in-from-right duration-300">
-          <div className="p-6 h-full flex flex-col">
-            <div className="flex justify-between items-start mb-8">
-              <div>
-                <span className="text-[10px] font-mono text-blueprint-blue font-bold uppercase tracking-widest">Node Inspection</span>
-                <h2 className="text-xl font-bold text-gray-900">{selectedNode.name}</h2>
+        {/* PANEL DERECHO: El Resumen de la Rama Seleccionada */}
+        <div className="w-2/5 flex flex-col bg-white overflow-hidden shadow-2xl">
+          {selectedNode ? (
+            <div className="flex-1 overflow-auto p-10 space-y-8 animate-in slide-in-from-right-8 duration-500">
+              <div className="space-y-2">
+                <span className="text-[10px] font-bold font-mono text-blue-600 bg-blue-50 px-2 py-1 rounded uppercase tracking-wider">
+                  Rama: {selectedNode.type}
+                </span>
+                <h2 className="text-4xl font-black text-slate-900 tracking-tighter uppercase leading-tight">
+                  {selectedNode.name}
+                </h2>
               </div>
-              <button onClick={() => setSelectedNode(null)} className="p-1 hover:bg-gray-100 rounded text-gray-400">
-                <X size={20} />
-              </button>
-            </div>
 
-            <div className="space-y-6 flex-1 overflow-auto">
-              <div className="bg-blueprint-bg p-4 rounded-md border border-blueprint-grid">
-                <p className="text-[10px] font-mono text-gray-400 uppercase mb-2">Entity Context</p>
-                <p className="text-sm text-gray-600 italic leading-relaxed">
-                  Sistema identificado como entidad de tipo <strong>{selectedNode.type}</strong> dentro de tu grafo de conocimiento privado.
+              <div className="prose prose-slate prose-lg">
+                <p className="text-slate-600 leading-relaxed italic text-lg">
+                  {selectedNode.summary || "La IA está procesando los detalles específicos de este concepto..."}
                 </p>
-                <button className="mt-4 flex items-center gap-2 text-blueprint-blue text-xs font-bold hover:underline">
-                  <FileText size={14} /> VIEW SOURCE DETAILS
+              </div>
+
+              {/* Botón de Fuente Original (Redirige al extracto) */}
+              <div className="pt-10">
+                <button className="w-full p-6 border-2 border-dashed border-slate-100 rounded-3xl flex flex-col items-center gap-3 group hover:border-blueprint-blue hover:bg-blue-50 transition-all">
+                  <BookOpen className="text-slate-300 group-hover:text-blueprint-blue transition-colors" size={24} />
+                  <div className="text-center">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-blueprint-blue">Validar Fuente Original</p>
+                    <p className="text-xs text-slate-400">Ver fragmento del PDF subrayado</p>
+                  </div>
                 </button>
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 border border-blueprint-grid rounded">
-                  <p className="text-[10px] font-mono text-gray-400 uppercase">Type</p>
-                  <p className="text-sm font-bold text-gray-800">{selectedNode.type}</p>
-                </div>
-                <div className="p-3 border border-blueprint-grid rounded">
-                  <p className="text-[10px] font-mono text-gray-400 uppercase">Database ID</p>
-                  <p className="text-sm font-bold text-blue-600 font-mono truncate">{selectedNode.id}</p>
-                </div>
-              </div>
             </div>
-          </div>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center p-20 text-center space-y-4">
+              <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-200">
+                <MousePointer2 size={32} />
+              </div>
+              <p className="font-mono text-[10px] text-slate-400 uppercase tracking-widest">Selecciona un punto en el mapa para estudiar su contenido</p>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
